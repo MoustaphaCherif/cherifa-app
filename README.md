@@ -1,6 +1,7 @@
 # Cherifa — marketplace d'occasion, Sénégal et Afrique de l'Ouest
 
 Nom de l'app : **Cherifa**.
+Business plan et plan de construction : voir le dossier [`docs/`](docs/).
 Le nom et les couleurs sont centralisés dans `src/config/brand.ts` et dans le manifeste de `vite.config.ts`.
 
 ## Lancer l'app
