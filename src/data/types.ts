@@ -31,6 +31,7 @@ export interface Listing {
   condition: ItemCondition;
   neighborhood: string;
   seller: Seller;
-  photoColor: string; // en attendant les vraies photos
+  photoColor: string; // couleur de fond en attendant (ou derrière) la photo
+  photoUrl?: string;
   imeiVerified?: boolean;
 }

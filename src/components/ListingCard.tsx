@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { priceLabel } from '../config/brand';
 import { conditionLabels, type Listing } from '../data/types';
+import { Photo } from './Photo';
 
 export function ListingCard({ listing }: { listing: Listing }) {
   const meta = [listing.size, conditionLabels[listing.condition], listing.neighborhood].filter(Boolean).join(' · ');
@@ -9,11 +10,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
       to={`/article/${listing.id}`}
       style={{ textDecoration: 'none', color: 'var(--encre)', background: 'var(--blanc)', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
     >
-      <div
-        role="img"
-        aria-label={`Photo : ${listing.title}`}
-        style={{ height: 150, background: listing.photoColor }}
-      />
+      <Photo listing={listing} height={150} />
       <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span className="price" style={{ fontSize: 17 }}>{priceLabel(listing.priceXof)}</span>
         <span style={{ fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{listing.title}</span>

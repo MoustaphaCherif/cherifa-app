@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useStore } from '../data/model';
 import { formatXof } from '../config/brand';
 import { categories } from '../data/demo';
 import { conditionLabels, type ItemCondition } from '../data/types';
@@ -8,6 +9,8 @@ const sizes = ['S', 'M', 'L', 'XL', 'Sur mesure'];
 const conditions: ItemCondition[] = ['neuf', 'tres_bon', 'bon'];
 
 export function Publier() {
+  const { addListing } = useStore();
+  const [newId, setNewId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0].id);
@@ -30,7 +33,21 @@ export function Publier() {
     if (!condition) errs.push("Choisis l'état de l'article.");
     if (category.requiresImei && !/^\d{15}$/.test(imei)) errs.push("Le numéro IMEI doit faire 15 chiffres (tape *#06# sur le téléphone).");
     setErrors(errs);
-    if (errs.length === 0) setDone(true); // L'envoi vers Supabase viendra ici.
+    if (errs.length > 0) return;
+    // Mode démo : enregistré en mémoire. Avec Supabase : insert + upload des photos.
+    const id = addListing({
+      title: title.trim(),
+      priceXof: priceNum,
+      categoryId,
+      size: category.requiresImei ? undefined : size ?? undefined,
+      condition: condition!,
+      neighborhood: 'Dakar',
+      photoColor: '#E9DFD0',
+      photoUrl: URL.createObjectURL(photos[0]),
+      imeiVerified: false, // la vérification IMEI se fait côté serveur
+    });
+    setNewId(id);
+    setDone(true);
   }
 
   if (done) {
@@ -38,7 +55,8 @@ export function Publier() {
       <main className="page" style={{ justifyContent: 'center', textAlign: 'center' }}>
         <h1 style={{ fontSize: 30 }}>C'est en ligne !</h1>
         <p style={{ fontSize: 17, color: 'var(--texte-2)' }}>« {title} » à {formatXof(priceNum)}. Tu recevras un message à chaque offre.</p>
-        <Link to="/accueil" className="btn btn-primary">Retour à l'accueil</Link>
+        {newId && <Link to={`/article/${newId}`} className="btn btn-primary">Voir mon annonce</Link>}
+        <Link to="/accueil" className="btn btn-outline">Retour à l'accueil</Link>
       </main>
     );
   }

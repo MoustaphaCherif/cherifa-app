@@ -19,6 +19,10 @@ export const brand = {
 export const BUYER_FEE_RATE = 0.05;
 export const BUYER_FEE_FIXED = 100;
 
+// Prix d'une course moto dans Dakar : à fixer avec les livreurs partenaires.
+// Tant qu'il vaut null, l'app affiche « à confirmer » au lieu d'un faux prix.
+export const DELIVERY_FEE_DAKAR_XOF: number | null = null;
+
 export function buyerProtectionFee(priceXof: number): number {
   return Math.round(priceXof * BUYER_FEE_RATE + BUYER_FEE_FIXED);
 }

@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { IconSearch } from '../components/Icons';
 import { ListingCard } from '../components/ListingCard';
 import { TabBar } from '../components/TabBar';
-import { categories, listings } from '../data/demo';
+import { categories } from '../data/demo';
+import { useStore } from '../data/model';
 
 export function Accueil() {
+  const { listings } = useStore();
   const [cat, setCat] = useState(categories[0].id);
   const visible = listings.filter((l) => l.categoryId === cat);
 

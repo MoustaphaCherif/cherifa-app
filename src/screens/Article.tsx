@@ -1,13 +1,15 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { IconBack, IconShield, IconVerified } from '../components/Icons';
+import { Photo } from '../components/Photo';
 import { buyerProtectionFee, formatXof, priceLabel } from '../config/brand';
-import { findListing } from '../data/demo';
+import { ME, useStore } from '../data/model';
 import { conditionLabels } from '../data/types';
 
 export function Article() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const listing = findListing(id);
+  const { listings, openConversation } = useStore();
+  const listing = listings.find((l) => l.id === id);
 
   if (!listing) {
     return (
@@ -20,11 +22,13 @@ export function Article() {
   }
 
   const hasPrice = listing.priceXof > 0;
+  const isMine = listing.seller.id === ME.id;
   const fee = hasPrice ? buyerProtectionFee(listing.priceXof) : 0;
 
   return (
     <>
-      <div role="img" aria-label={`Photo : ${listing.title}`} style={{ height: 320, background: listing.photoColor, position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
+        <Photo listing={listing} height={320} />
         <button type="button" onClick={() => navigate(-1)} aria-label="Retour"
           style={{ position: 'absolute', left: 16, top: 16, width: 44, height: 44, borderRadius: 999, border: 'none', background: 'var(--blanc)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <IconBack />
@@ -65,8 +69,20 @@ export function Article() {
         )}
       </main>
       <div style={{ position: 'sticky', bottom: 0, background: 'var(--blanc)', borderTop: '1px solid #e9dfd0', padding: '12px 18px 18px', display: 'flex', gap: 10 }}>
-        <Link to="/messages" className="btn btn-outline" style={{ flex: 1 }}>Faire une offre</Link>
-        <button type="button" className="btn btn-primary" style={{ flex: 1.3 }} disabled={!hasPrice}>Acheter</button>
+        {isMine ? (
+          <Link to="/armoire" className="btn btn-outline btn-block">C'est ton article : voir mon armoire</Link>
+        ) : (
+          <>
+            <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => navigate(`/messages/${openConversation(listing.id)}`)}>
+              {hasPrice ? 'Faire une offre' : 'Demander le prix'}
+            </button>
+            {hasPrice ? (
+              <Link to={`/paiement/${listing.id}`} className="btn btn-primary" style={{ flex: 1.3 }}>Acheter</Link>
+            ) : (
+              <button type="button" className="btn btn-primary" style={{ flex: 1.3 }} disabled>Acheter</button>
+            )}
+          </>
+        )}
       </div>
     </>
   );
