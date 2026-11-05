@@ -11,8 +11,8 @@ export default defineConfig({
       includeAssets: ['favicon.svg'],
       manifest: {
         // À mettre à jour en même temps que src/config/brand.ts
-        name: 'Jënd Jaay',
-        short_name: 'JendJaay',
+        name: 'Cherifa',
+        short_name: 'Cherifa',
         description: "Achète et vends d'occasion, sans risque, au Sénégal.",
         lang: 'fr',
         start_url: '/',

@@ -1,6 +1,6 @@
-# Marketplace d'occasion — Sénégal et Afrique de l'Ouest
+# Cherifa — marketplace d'occasion, Sénégal et Afrique de l'Ouest
 
-Nom de travail : **Jënd Jaay** (nom définitif à choisir : Troki, Bazaro, Revendi, Kalabas…).
+Nom de l'app : **Cherifa**.
 Le nom et les couleurs sont centralisés dans `src/config/brand.ts` et dans le manifeste de `vite.config.ts`.
 
 ## Lancer l'app

@@ -1,10 +1,10 @@
 // Identité de la marque : TOUT ce qui dépend du nom de l'app est ici.
-// Le nom définitif n'est pas encore choisi (pistes : Troki, Bazaro, Revendi, Kalabas).
+// Nom de l'app : Cherifa.
 // Changer le nom = modifier ce fichier (et le "name" du manifeste dans vite.config.ts).
 
 export const brand = {
-  name: 'Jënd Jaay',
-  shortName: 'JendJaay',
+  name: 'Cherifa',
+  shortName: 'Cherifa',
   tagline: 'Vends en 1 minute. Garde 100 %. Achète sans risque.',
   colors: {
     terracotta: '#B9491F',
