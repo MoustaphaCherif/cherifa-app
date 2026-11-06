@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Header } from '../components/Header';
 import { IconShield } from '../components/Icons';
 import { buyerProtectionFee, DELIVERY_FEE_DAKAR_XOF, formatXof } from '../config/brand';
-import { ME, useStore, type DeliveryMode, type Provider } from '../data/model';
+import { errorText, useStore, type DeliveryMode, type Provider } from '../data/model';
 
 const providers: { id: Provider; label: string; short: string; bg: string }[] = [
   { id: 'wave', label: 'Wave', short: 'W', bg: '#1DC8F2' },
@@ -14,15 +14,16 @@ export function Paiement() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { listings, conversations, orders, createOrder } = useStore();
+  const { listings, conversations, orders, createOrder, me } = useStore();
   const listing = listings.find((l) => l.id === id);
 
   const [mode, setMode] = useState<DeliveryMode>('moto');
   const [address, setAddress] = useState('');
   const [provider, setProvider] = useState<Provider>('wave');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  if (!listing || listing.priceXof <= 0 || listing.seller.id === ME.id) {
+  if (!listing || listing.priceXof <= 0 || listing.seller.id === me?.id) {
     return <main className="page"><Header title="Paiement impossible" /><p>Cet article n'est pas disponible à l'achat.</p><Link to="/accueil">Retour à l'accueil</Link></main>;
   }
   if (orders.some((o) => o.listingId === listing.id)) {
@@ -41,7 +42,7 @@ export function Paiement() {
   const delivery = mode === 'moto' ? DELIVERY_FEE_DAKAR_XOF : 0;
   const total = delivery === null ? null : itemPrice + fee + delivery;
 
-  function pay() {
+  async function pay() {
     if (mode === 'moto' && address.trim().length < 5) {
       setError('Indique ton quartier et un point de repère pour le livreur.');
       return;
@@ -49,15 +50,21 @@ export function Paiement() {
     // Production : appel d'une Edge Function qui crée la session de paiement
     // Wave / Orange Money, puis redirection vers leur page. La commande ne passe
     // à « payée » qu'à la réception du webhook de confirmation.
-    const orderId = createOrder({
-      listingId: listing!.id,
-      itemPriceXof: itemPrice,
-      deliveryFeeXof: delivery,
-      mode,
-      address: mode === 'moto' ? address.trim() : undefined,
-      provider,
-    });
-    navigate(`/commande/${orderId}`, { replace: true });
+    setBusy(true);
+    try {
+      const orderId = await createOrder({
+        listingId: listing!.id,
+        itemPriceXof: itemPrice,
+        deliveryFeeXof: delivery,
+        mode,
+        address: mode === 'moto' ? address.trim() : undefined,
+        provider,
+      });
+      navigate(`/commande/${orderId}`, { replace: true });
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(false);
+    }
   }
 
   const card = (on: boolean) => ({
@@ -117,7 +124,7 @@ export function Paiement() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: 'var(--pirogue)', fontWeight: 600 }}>
           <IconShield size={18} color="#14396B" />Le vendeur est payé seulement quand tu confirmes la réception.
         </div>
-        <button type="button" className="btn btn-primary btn-block" onClick={pay}>
+        <button type="button" className="btn btn-primary btn-block" onClick={pay} disabled={busy}>
           Payer avec {provider === 'wave' ? 'Wave' : 'Orange Money'}
         </button>
       </div>

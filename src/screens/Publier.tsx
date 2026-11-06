@@ -1,53 +1,60 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useStore } from '../data/model';
+import { errorText, useStore } from '../data/model';
 import { formatXof } from '../config/brand';
-import { categories } from '../data/demo';
 import { conditionLabels, type ItemCondition } from '../data/types';
 
 const sizes = ['S', 'M', 'L', 'XL', 'Sur mesure'];
 const conditions: ItemCondition[] = ['neuf', 'tres_bon', 'bon'];
 
 export function Publier() {
-  const { addListing } = useStore();
+  const { addListing, categories } = useStore();
   const [newId, setNewId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
-  const [categoryId, setCategoryId] = useState(categories[0].id);
+  const [chosenCategory, setCategoryId] = useState<string | null>(null);
+  const categoryId = chosenCategory ?? categories[0]?.id ?? '';
   const [size, setSize] = useState<string | null>(null);
   const [condition, setCondition] = useState<ItemCondition | null>(null);
   const [imei, setImei] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
   const [done, setDone] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
 
-  const category = categories.find((c) => c.id === categoryId)!;
+  const category = categories.find((c) => c.id === categoryId);
   const priceNum = parseInt(price, 10);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const errs: string[] = [];
     if (photos.length === 0) errs.push('Ajoute au moins une photo.');
     if (title.trim().length < 3) errs.push('Dis en quelques mots ce que tu vends.');
     if (!(priceNum >= 100)) errs.push('Indique un prix (100 F minimum).');
     if (!condition) errs.push("Choisis l'état de l'article.");
-    if (category.requiresImei && !/^\d{15}$/.test(imei)) errs.push("Le numéro IMEI doit faire 15 chiffres (tape *#06# sur le téléphone).");
+    if (!category) errs.push('Choisis une catégorie.');
+    if (category?.requiresImei && !/^\d{15}$/.test(imei)) errs.push("Le numéro IMEI doit faire 15 chiffres (tape *#06# sur le téléphone).");
     setErrors(errs);
     if (errs.length > 0) return;
-    // Mode démo : enregistré en mémoire. Avec Supabase : insert + upload des photos.
-    const id = addListing({
-      title: title.trim(),
-      priceXof: priceNum,
-      categoryId,
-      size: category.requiresImei ? undefined : size ?? undefined,
-      condition: condition!,
-      neighborhood: 'Dakar',
-      photoColor: '#E9DFD0',
-      photoUrl: URL.createObjectURL(photos[0]),
-      imeiVerified: false, // la vérification IMEI se fait côté serveur
-    });
-    setNewId(id);
-    setDone(true);
+    // Mode démo : enregistré en mémoire. Avec Supabase : photos compressées, envoyées, puis annonce en ligne.
+    setBusy(true);
+    try {
+      const id = await addListing({
+        title: title.trim(),
+        priceXof: priceNum,
+        categoryId,
+        size: category!.requiresImei ? undefined : size ?? undefined,
+        condition: condition!,
+        imei: category!.requiresImei ? imei : undefined, // vérifié ensuite côté serveur
+        photos,
+      });
+      setNewId(id);
+      setDone(true);
+    } catch (err) {
+      setErrors([errorText(err)]);
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (done) {
@@ -102,7 +109,7 @@ export function Publier() {
           <span className="price" style={{ fontSize: 20 }}>{priceNum > 0 ? formatXof(priceNum) : '—'}</span>
         </div>
 
-        {category.requiresImei ? (
+        {category?.requiresImei ? (
           <div className="field">
             <label htmlFor="imei">Numéro IMEI</label>
             <input id="imei" className="input" inputMode="numeric" maxLength={15} value={imei} onChange={(e) => setImei(e.target.value.replace(/\D/g, ''))} aria-describedby="imei-aide" />
@@ -129,7 +136,7 @@ export function Publier() {
             {errors.map((er) => <li key={er}>{er}</li>)}
           </ul>
         )}
-        <button type="submit" className="btn btn-primary btn-block">Publier mon article</button>
+        <button type="submit" className="btn btn-primary btn-block" disabled={busy}>{busy ? 'Envoi des photos…' : 'Publier mon article'}</button>
       </form>
     </main>
   );

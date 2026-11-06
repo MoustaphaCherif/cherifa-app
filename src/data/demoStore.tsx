@@ -1,14 +1,12 @@
-// État partagé du MODE DÉMO : annonces, conversations et commandes en mémoire.
-// Quand Supabase sera branché, chaque action ci-dessous deviendra un appel :
-//  - addListing        → insert dans "listings" + upload des photos
-//  - sendMessage/Offer → insert dans "messages"
-//  - createOrder       → Edge Function qui crée la session Wave / Orange Money
-//  - advance/confirm   → webhooks et Edge Functions (jamais depuis l'app : voir le schéma RLS)
+// Store du MODE DÉMO : annonces, conversations et commandes en mémoire.
+// Utilisé quand .env.local n'existe pas. Même interface que supabaseStore.tsx.
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { buyerProtectionFee } from '../config/brand';
-import { listings as demoListings } from './demo';
-import type { Listing } from './types';
-import { ME, ORDER_STEPS, StoreContext, type Conversation, type Message, type Order, type Store } from './model';
+import { categories, listings as demoListings } from './demo';
+import type { Listing, Seller } from './types';
+import { ORDER_STEPS, StoreContext, type Conversation, type Message, type Order, type Store } from './model';
+
+const ME: Seller = { id: 'me', displayName: 'Moi', verified: false, neighborhood: 'Dakar' };
 
 let counter = 0;
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(counter++).toString(36)}`;
@@ -17,14 +15,15 @@ const seedConversations: Conversation[] = [
   {
     id: 'c-demo',
     listingId: 'l1',
+    otherName: 'Fatou D.',
     messages: [
       { id: 'm1', from: 'me', body: 'Salam, la robe est toujours dispo ? Elle tombe comment ?' },
-      { id: 'm2', from: 'seller', body: 'Waaw, toujours là. Elle tombe aux chevilles pour 1,65 m.' },
+      { id: 'm2', from: 'other', body: 'Waaw, toujours là. Elle tombe aux chevilles pour 1,65 m.' },
     ],
   },
 ];
 
-export function StoreProvider({ children }: { children: ReactNode }) {
+export function DemoStoreProvider({ children }: { children: ReactNode }) {
   const [listings, setListings] = useState<Listing[]>(demoListings);
   const [conversations, setConversations] = useState<Conversation[]>(seedConversations);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -33,46 +32,52 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setConversations((cs) => cs.map((c) => (c.id === convId ? { ...c, messages: [...c.messages, m] } : c)));
   }, []);
 
-  const addListing: Store['addListing'] = useCallback((l) => {
+  const noop = useCallback(async () => {}, []);
+
+  const addListing: Store['addListing'] = useCallback(async ({ photos, imei, ...l }) => {
     const id = newId('l');
-    setListings((ls) => [{ ...l, id, seller: ME }, ...ls]);
+    const listing: Listing = {
+      ...l, id, seller: ME, neighborhood: ME.neighborhood, photoColor: '#E9DFD0',
+      photoUrl: photos[0] ? URL.createObjectURL(photos[0]) : undefined,
+      imeiVerified: imei ? false : undefined, // la vérification IMEI se fait côté serveur
+    };
+    setListings((ls) => [listing, ...ls]);
     return id;
   }, []);
 
   const openConversation: Store['openConversation'] = useCallback(
-    (listingId) => {
+    async (listingId) => {
       const existing = conversations.find((c) => c.listingId === listingId);
       if (existing) return existing.id;
       const id = newId('c');
-      setConversations((cs) => [...cs, { id, listingId, messages: [] }]);
+      const otherName = listings.find((l) => l.id === listingId)?.seller.displayName ?? 'Vendeur';
+      setConversations((cs) => [...cs, { id, listingId, otherName, messages: [] }]);
       return id;
     },
-    [conversations],
+    [conversations, listings],
   );
 
   const sendMessage: Store['sendMessage'] = useCallback(
-    (convId, body) => pushMessage(convId, { id: newId('m'), from: 'me', body }),
+    async (convId, body) => pushMessage(convId, { id: newId('m'), from: 'me', body }),
     [pushMessage],
   );
 
   const sendOffer: Store['sendOffer'] = useCallback(
-    (convId, amountXof) => pushMessage(convId, { id: newId('m'), from: 'me', offerXof: amountXof, offerStatus: 'proposee' }),
+    async (convId, amountXof) => pushMessage(convId, { id: newId('m'), from: 'me', offerXof: amountXof, offerStatus: 'proposee' }),
     [pushMessage],
   );
 
-  const simulateSellerReply: Store['simulateSellerReply'] = useCallback((convId, accept) => {
+  // En démo, on simule la réponse du vendeur à NOTRE offre (il n'y a pas d'autre personne).
+  const respondToOffer: Store['respondToOffer'] = useCallback(async (convId, messageId, accept) => {
     setConversations((cs) =>
-      cs.map((c) => {
-        if (c.id !== convId) return c;
-        const idx = c.messages.map((m) => m.offerStatus).lastIndexOf('proposee');
-        if (idx < 0) return c;
-        const messages = c.messages.map((m, i) => (i === idx ? { ...m, offerStatus: accept ? ('acceptee' as const) : ('refusee' as const) } : m));
-        return { ...c, messages };
-      }),
+      cs.map((c) => (c.id !== convId ? c : {
+        ...c,
+        messages: c.messages.map((m) => (m.id === messageId && m.offerStatus === 'proposee' ? { ...m, offerStatus: accept ? 'acceptee' : 'refusee' } : m)),
+      })),
     );
   }, []);
 
-  const createOrder: Store['createOrder'] = useCallback((o) => {
+  const createOrder: Store['createOrder'] = useCallback(async (o) => {
     const id = newId('o');
     const handoverCode = String(Math.floor(1000 + Math.random() * 9000));
     setOrders((os) => [...os, { ...o, id, step: 'payee', dispute: false, handoverCode, buyerFeeXof: buyerProtectionFee(o.itemPriceXof) }]);
@@ -98,9 +103,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setOrders((os) => os.map((o) => (o.id === orderId && o.step !== 'confirmee' ? { ...o, dispute: true } : o)));
   }, []);
 
-  const value = useMemo(
-    () => ({ listings, conversations, orders, addListing, openConversation, sendMessage, sendOffer, simulateSellerReply, createOrder, advanceOrder, confirmOrder, reportProblem }),
-    [listings, conversations, orders, addListing, openConversation, sendMessage, sendOffer, simulateSellerReply, createOrder, advanceOrder, confirmOrder, reportProblem],
+  const value = useMemo<Store>(
+    () => ({
+      isDemo: true, auth: 'demo', me: ME, categories, listings, conversations, orders,
+      createProfile: noop, signOut: noop, addListing, openConversation, sendMessage, sendOffer, respondToOffer,
+      createOrder, advanceOrder, confirmOrder, reportProblem,
+    }),
+    [listings, conversations, orders, noop, addListing, openConversation, sendMessage, sendOffer, respondToOffer, createOrder, advanceOrder, confirmOrder, reportProblem],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

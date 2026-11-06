@@ -13,6 +13,7 @@ export interface Category {
   id: string;
   label: string;
   requiresImei: boolean;
+  parentId?: string; // ex. « Femme » est dans « Mode »
 }
 
 export interface Seller {

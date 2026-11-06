@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Icons';
 import { brand } from '../config/brand';
+import { useStore } from '../data/model';
 import { isDemoMode, supabase } from '../lib/supabase';
 
 const countries = [
@@ -16,6 +17,10 @@ export function Bienvenue() {
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const country = countries[countryIdx];
+  const { auth } = useStore();
+
+  if (auth === 'connecte') return <Navigate to="/accueil" replace />;
+  if (auth === 'sans_profil') return <Navigate to="/profil" replace />;
 
   async function sendCode(e: React.FormEvent) {
     e.preventDefault();

@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { IconShield, IconVerified } from '../components/Icons';
 import { formatXof, priceLabel } from '../config/brand';
-import { useStore, type Message } from '../data/model';
+import { errorText, useStore, type Message } from '../data/model';
 
 function Bubble({ m, listingId }: { m: Message; listingId: string }) {
   const mine = m.from === 'me';
@@ -37,42 +37,63 @@ function Bubble({ m, listingId }: { m: Message; listingId: string }) {
 
 export function Conversation() {
   const { id } = useParams();
-  const { conversations, listings, sendMessage, sendOffer, simulateSellerReply } = useStore();
+  const { conversations, listings, sendMessage, sendOffer, respondToOffer, isDemo, me } = useStore();
   const conv = conversations.find((c) => c.id === id);
   const listing = listings.find((l) => l.id === conv?.listingId);
   const [text, setText] = useState('');
   const [offerOpen, setOfferOpen] = useState(false);
   const [offer, setOffer] = useState('');
   const [offerError, setOfferError] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   if (!conv || !listing) {
     return <main className="page"><Header title="Conversation introuvable" /><Link to="/messages">Retour aux messages</Link></main>;
   }
 
-  const pending = conv.messages.some((m) => m.offerStatus === 'proposee');
+  const pendingOffer = conv.messages.findLast((m) => m.offerStatus === 'proposee');
+  const pending = !!pendingOffer;
+  const iAmSeller = listing.seller.id === me?.id;
 
-  function submitText(e: React.FormEvent) {
-    e.preventDefault();
-    if (!text.trim()) return;
-    sendMessage(conv!.id, text.trim());
-    setText('');
+  // Envoie une action au store et affiche l'erreur éventuelle, sans bloquer l'écran.
+  async function run(action: () => Promise<void>): Promise<boolean> {
+    setBusy(true);
+    setError('');
+    try {
+      await action();
+      return true;
+    } catch (e) {
+      setError(errorText(e));
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function submitOffer(e: React.FormEvent) {
+  async function submitText(e: React.FormEvent) {
+    e.preventDefault();
+    const body = text.trim();
+    if (!body) return;
+    setText('');
+    if (!(await run(() => sendMessage(conv!.id, body)))) setText(body);
+  }
+
+  async function submitOffer(e: React.FormEvent) {
     e.preventDefault();
     const n = parseInt(offer, 10);
     if (!(n >= 100)) return setOfferError('Indique un montant (100 F minimum).');
     if (listing!.priceXof > 0 && n >= listing!.priceXof) return setOfferError(`Ton offre doit être inférieure au prix (${formatXof(listing!.priceXof)}).`);
-    sendOffer(conv!.id, n);
-    setOffer('');
     setOfferError('');
-    setOfferOpen(false);
+    if (await run(() => sendOffer(conv!.id, n))) {
+      setOffer('');
+      setOfferOpen(false);
+    }
   }
 
   return (
     <>
       <div style={{ background: 'var(--blanc)', borderBottom: '1px solid #e9dfd0', padding: '16px 16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <Header title={listing.seller.displayName} subtitle={listing.seller.verified ? 'Vendeur vérifié' : 'Nouveau vendeur'} />
+        <Header title={conv.otherName} subtitle={iAmSeller ? 'Intéressé par ton article' : listing.seller.verified ? 'Vendeur vérifié' : 'Nouveau vendeur'} />
         <Link to={`/article/${listing.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--sable)', borderRadius: 12, padding: 8, textDecoration: 'none', color: 'var(--encre)' }}>
           <span style={{ flex: 1 }}>{listing.title}{listing.seller.verified && <> <IconVerified size={14} /></>}</span>
           <span className="price">{priceLabel(listing.priceXof)}</span>
@@ -83,15 +104,27 @@ export function Conversation() {
         {conv.messages.length === 0 && <p style={{ color: 'var(--texte-3)', textAlign: 'center' }}>Pose ta question ou fais une offre.</p>}
         {conv.messages.map((m) => <Bubble key={m.id} m={m} listingId={listing.id} />)}
 
-        {pending && (
-          <div className="card" style={{ border: '1px dashed var(--texte-3)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontSize: 13, color: 'var(--texte-2)' }}>Mode démo : simuler la réponse du vendeur</span>
+        {pendingOffer?.from === 'other' && (
+          <div className="card" style={{ border: '2px solid var(--pirogue)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontWeight: 700 }}>Offre de {formatXof(pendingOffer.offerXof!)} : tu acceptes ?</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" className="chip" onClick={() => simulateSellerReply(conv.id, true)}>Il accepte</button>
-              <button type="button" className="chip" onClick={() => simulateSellerReply(conv.id, false)}>Il refuse</button>
+              <button type="button" className="btn btn-primary" style={{ flex: 1, height: 46 }} disabled={busy} onClick={() => run(() => respondToOffer(conv.id, pendingOffer.id, true))}>Accepter</button>
+              <button type="button" className="btn btn-outline" style={{ flex: 1, height: 46 }} disabled={busy} onClick={() => run(() => respondToOffer(conv.id, pendingOffer.id, false))}>Refuser</button>
             </div>
           </div>
         )}
+
+        {isDemo && pendingOffer?.from === 'me' && (
+          <div className="card" style={{ border: '1px dashed var(--texte-3)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 13, color: 'var(--texte-2)' }}>Mode démo : simuler la réponse du vendeur</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="chip" onClick={() => run(() => respondToOffer(conv.id, pendingOffer.id, true))}>Il accepte</button>
+              <button type="button" className="chip" onClick={() => run(() => respondToOffer(conv.id, pendingOffer.id, false))}>Il refuse</button>
+            </div>
+          </div>
+        )}
+
+        {error && <p role="alert" style={{ margin: 0, color: 'var(--terracotta-dark)', fontWeight: 600 }}>{error}</p>}
 
         <div style={{ marginTop: 'auto', background: '#FDF1DD', borderRadius: 12, padding: '10px 12px', fontSize: 13, lineHeight: 1.4, color: '#4A3410', display: 'flex', gap: 8 }}>
           <IconShield size={18} color="#9A6412" />
@@ -106,17 +139,18 @@ export function Conversation() {
             <div style={{ display: 'flex', gap: 8 }}>
               <input id="offre" className="input" type="number" inputMode="numeric" value={offer} onChange={(e) => setOffer(e.target.value)} autoFocus
                 aria-invalid={offerError ? true : undefined} aria-describedby={offerError ? 'offre-err' : undefined} />
-              <button type="submit" className="btn btn-primary" style={{ height: 50 }}>Envoyer</button>
+              <button type="submit" className="btn btn-primary" style={{ height: 50 }} disabled={busy}>Envoyer</button>
             </div>
             {offerError && <span id="offre-err" role="alert" style={{ color: 'var(--terracotta-dark)', fontWeight: 600, fontSize: 14 }}>{offerError}</span>}
             <button type="button" className="chip" style={{ alignSelf: 'flex-start' }} onClick={() => setOfferOpen(false)}>Annuler</button>
           </form>
         ) : (
           <form onSubmit={submitText} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button type="button" className="btn btn-outline" style={{ height: 46, padding: '0 14px', fontSize: 14 }} onClick={() => setOfferOpen(true)} disabled={pending}>Offre</button>
+            {/* Les offres viennent de l'acheteur ; le vendeur y répond avec Accepter / Refuser. */}
+            {!iAmSeller && <button type="button" className="btn btn-outline" style={{ height: 46, padding: '0 14px', fontSize: 14 }} onClick={() => setOfferOpen(true)} disabled={pending}>Offre</button>}
             <label htmlFor="msg" className="sr-only">Message</label>
             <input id="msg" className="input" style={{ height: 46, background: 'var(--sable)' }} placeholder="Écris un message…" value={text} onChange={(e) => setText(e.target.value)} />
-            <button type="submit" className="btn btn-primary" style={{ height: 46, padding: '0 14px', fontSize: 14 }}>Envoyer</button>
+            <button type="submit" className="btn btn-primary" style={{ height: 46, padding: '0 14px', fontSize: 14 }} disabled={busy}>Envoyer</button>
           </form>
         )}
       </div>

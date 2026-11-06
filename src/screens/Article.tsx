@@ -2,13 +2,16 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { IconBack, IconShield, IconVerified } from '../components/Icons';
 import { Photo } from '../components/Photo';
 import { buyerProtectionFee, formatXof, priceLabel } from '../config/brand';
-import { ME, useStore } from '../data/model';
+import { useState } from 'react';
+import { errorText, useStore } from '../data/model';
 import { conditionLabels } from '../data/types';
 
 export function Article() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { listings, openConversation } = useStore();
+  const { listings, openConversation, me } = useStore();
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
   const listing = listings.find((l) => l.id === id);
 
   if (!listing) {
@@ -22,7 +25,18 @@ export function Article() {
   }
 
   const hasPrice = listing.priceXof > 0;
-  const isMine = listing.seller.id === ME.id;
+  const isMine = listing.seller.id === me?.id;
+
+  async function contact() {
+    setBusy(true);
+    setError('');
+    try {
+      navigate(`/messages/${await openConversation(listing!.id)}`);
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(false);
+    }
+  }
   const fee = hasPrice ? buyerProtectionFee(listing.priceXof) : 0;
 
   return (
@@ -67,13 +81,14 @@ export function Article() {
             <dt style={{ color: 'var(--texte-2)' }}>Livraison</dt><dd style={{ margin: 0 }}>Choisie au paiement</dd>
           </dl>
         )}
+        {error && <p role="alert" style={{ margin: 0, color: 'var(--terracotta-dark)', fontWeight: 600 }}>{error}</p>}
       </main>
       <div style={{ position: 'sticky', bottom: 0, background: 'var(--blanc)', borderTop: '1px solid #e9dfd0', padding: '12px 18px 18px', display: 'flex', gap: 10 }}>
         {isMine ? (
           <Link to="/armoire" className="btn btn-outline btn-block">C'est ton article : voir mon armoire</Link>
         ) : (
           <>
-            <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => navigate(`/messages/${openConversation(listing.id)}`)}>
+            <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={contact} disabled={busy}>
               {hasPrice ? 'Faire une offre' : 'Demander le prix'}
             </button>
             {hasPrice ? (

@@ -30,7 +30,7 @@ export function Messages() {
                 <Link to={`/messages/${c.id}`} className="card" style={{ display: 'flex', gap: 12, alignItems: 'center', textDecoration: 'none', color: 'var(--encre)' }}>
                   <div aria-hidden="true" style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0, backgroundColor: l.photoColor, backgroundImage: l.photoUrl ? `url("${l.photoUrl}")` : undefined, backgroundSize: 'cover' }} />
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700 }}>{l.seller.displayName} · {l.title}</div>
+                    <div style={{ fontWeight: 700 }}>{c.otherName} · {l.title}</div>
                     <div style={{ fontSize: 14, color: 'var(--texte-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{preview(c.messages.at(-1))}</div>
                   </div>
                 </Link>

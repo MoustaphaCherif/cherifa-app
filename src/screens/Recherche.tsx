@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ListingCard } from '../components/ListingCard';
 import { TabBar } from '../components/TabBar';
-import { categories } from '../data/demo';
-import { useStore } from '../data/model';
+import { inCategory, useStore } from '../data/model';
 import { conditionLabels, type ItemCondition } from '../data/types';
 
 // Recherche sans accents ni majuscules : "telephone" trouve "Téléphone".
@@ -11,7 +10,7 @@ const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').to
 const conditions: ItemCondition[] = ['neuf', 'tres_bon', 'bon'];
 
 export function Recherche() {
-  const { listings } = useStore();
+  const { listings, categories } = useStore();
   const [q, setQ] = useState('');
   const [cat, setCat] = useState<string | null>(null);
   const [cond, setCond] = useState<ItemCondition | null>(null);
@@ -26,7 +25,7 @@ export function Recherche() {
     return listings.filter((l) => {
       const text = norm(`${l.title} ${l.neighborhood} ${l.size ?? ''}`);
       if (!words.every((w) => text.includes(w))) return false;
-      if (cat && l.categoryId !== cat) return false;
+      if (cat && !inCategory(l, cat, categories)) return false;
       if (cond && l.condition !== cond) return false;
       if (verifiedOnly && !l.seller.verified) return false;
       // Un article sans prix affiché ne correspond pas à un filtre de prix.
@@ -35,7 +34,7 @@ export function Recherche() {
       if (!isNaN(hi) && l.priceXof > hi) return false;
       return true;
     });
-  }, [listings, q, cat, cond, min, max, verifiedOnly]);
+  }, [listings, categories, q, cat, cond, min, max, verifiedOnly]);
 
   const toggle = <T,>(current: T | null, value: T, set: (v: T | null) => void) => set(current === value ? null : value);
 

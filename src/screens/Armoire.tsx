@@ -3,23 +3,23 @@ import { Link } from 'react-router-dom';
 import { ListingCard } from '../components/ListingCard';
 import { TabBar } from '../components/TabBar';
 import { formatXof } from '../config/brand';
-import { ME, useStore } from '../data/model';
+import { useStore } from '../data/model';
 
 type Tab = 'vente' | 'achats';
 
 export function Armoire() {
-  const { listings, orders } = useStore();
+  const { listings, orders, me, isDemo, signOut } = useStore();
   const [tab, setTab] = useState<Tab>('vente');
-  const mine = listings.filter((l) => l.seller.id === ME.id);
+  const mine = listings.filter((l) => l.seller.id === me?.id);
 
   return (
     <>
       <main className="page">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div aria-hidden="true" style={{ width: 56, height: 56, borderRadius: 999, background: 'var(--terracotta)', color: 'var(--blanc)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 20 }}>M</div>
+          <div aria-hidden="true" style={{ width: 56, height: 56, borderRadius: 999, background: 'var(--terracotta)', color: 'var(--blanc)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 20 }}>{(me?.displayName ?? 'M').slice(0, 1).toUpperCase()}</div>
           <div>
             <h1 style={{ fontSize: 24 }}>Sama armoire</h1>
-            <p style={{ margin: 0, color: 'var(--texte-2)', fontSize: 14 }}>{ME.neighborhood}</p>
+            <p style={{ margin: 0, color: 'var(--texte-2)', fontSize: 14 }}>{isDemo ? me?.neighborhood : `${me?.displayName} · ${me?.neighborhood}`}</p>
           </div>
         </div>
 
@@ -64,6 +64,8 @@ export function Armoire() {
             })}
           </ul>
         ))}
+
+        {!isDemo && <button type="button" className="btn btn-outline" style={{ marginTop: 'auto' }} onClick={signOut}>Se déconnecter</button>}
       </main>
       <TabBar />
     </>
