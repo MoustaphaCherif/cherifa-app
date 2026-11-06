@@ -14,8 +14,9 @@ npm run lint
 ```
 
 Sans configuration, l'app tourne en **mode démo** avec des données fictives (`src/data/demo.ts`).
-Pour la brancher sur Supabase : copier `.env.example` en `.env.local` et remplir l'URL et la clé `anon`
-du projet Supabase (région Paris).
+Pour la brancher sur Supabase, suivre le guide [`docs/supabase.md`](docs/supabase.md) (projet en région Paris,
+schéma, SMS, puis `.env.local`). L'app choisit seule son mode : `src/data/store.tsx` charge
+`demoStore.tsx` (en mémoire) ou `supabaseStore.tsx` (vraies données), qui ont la même interface.
 
 ## Ce qui est fait
 
@@ -23,15 +24,15 @@ du projet Supabase (région Paris).
 | --- | --- |
 | PWA React + Vite + TypeScript, installable | Fait |
 | Identité (couleurs, typographies, logo) reprise des maquettes | Fait |
-| Écran Bienvenue (connexion par SMS via Supabase, +221 / +33) | Fait, testé en démo |
-| Accueil (catégories, fil d'annonces) | Fait, données démo |
-| Recherche (texte sans accents, catégorie, état, prix, vendeurs vérifiés) | Fait, données démo |
-| Fiche article (prix, protection acheteur, vendeur vérifié) | Fait, données démo |
-| Publier (photos, prix, catégorie, IMEI pour les téléphones, validation) | Fait, enregistré en mémoire (démo) |
-| Messagerie et offres de prix (réponse du vendeur simulée) | Fait, démo |
+| Connexion par SMS (+221 / +33), saisie du code, création du profil | Fait, branché sur Supabase |
+| Accueil (catégories, fil d'annonces) | Fait, branché sur Supabase |
+| Recherche (texte sans accents, catégorie, état, prix, vendeurs vérifiés) | Fait, branché sur Supabase |
+| Fiche article (prix, protection acheteur, vendeur vérifié) | Fait, branché sur Supabase |
+| Publier (photos compressées, prix, catégorie, IMEI pour les téléphones) | Fait, branché sur Supabase (photos dans Storage) |
+| Messagerie et offres de prix, en temps réel ; le vendeur accepte ou refuse | Fait, branché sur Supabase |
 | Paiement (moto / main propre, Wave / Orange Money, récapitulatif) | Écran fait, paiement réel à brancher |
-| Suivi de commande (étapes, code de remise, confirmation, litige) | Fait, étapes simulées en démo |
-| Sama armoire (mes annonces, mes achats, argent disponible) | Fait, démo |
+| Suivi de commande (étapes, code de remise, confirmation, litige) | Fait en démo ; réel avec le paiement |
+| Sama armoire (mes annonces, mes achats, déconnexion) | Fait, branché sur Supabase |
 
 En mode démo, tout le parcours marche de bout en bout : chercher → négocier → payer → suivre → confirmer,
 et publier un article qui apparaît dans l'armoire. Les données sont en mémoire (`src/data/store.tsx`)
@@ -48,9 +49,12 @@ vaut `null`, et l'app affiche « À confirmer » plutôt qu'un faux prix.
   paiements, versements, journal, messagerie, avis) et règles de sécurité.
 - Principe : **tout ce qui touche à l'argent** (statut des commandes, séquestre, versements, validation IMEI,
   badge vendeur vérifié) ne peut être écrit que côté serveur, jamais depuis l'app.
-- `supabase/tests/rls_test.sql` : 8 scénarios de fraude (se déclarer vérifié, marquer une annonce vendue,
-  créer une commande « payée », accepter sa propre offre, laisser un faux avis…) qui doivent tous être refusés.
-  À lancer après `auth_stub.sql` sur un PostgreSQL de test.
+- `supabase/migrations/0002_photos_temps_reel_offres.sql` : bucket `photos` (chacun écrit dans son dossier),
+  temps réel sur la messagerie, fonction serveur `respond_to_offer` pour accepter ou refuser une offre.
+- `supabase/tests/` : 17 scénarios sur un PostgreSQL de test. Ordre : `auth_stub.sql`, `storage_stub.sql`,
+  les deux migrations, puis `rls_test.sql` (8 fraudes : se déclarer vérifié, marquer vendu, commande « payée »,
+  accepter sa propre offre, faux avis…) et `rls_test_0002.sql` (photo dans le dossier d'un autre, réponse à sa
+  propre offre, double réponse…). Chaque cas affiche le résultat attendu.
 
 ## Tests de l'app
 

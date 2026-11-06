@@ -58,17 +58,20 @@ npm run lint     # doit passer sans avertissement
 
 - Test de bout en bout : `npm run build && npx vite preview --port 4173`, puis
   `node tests/parcours.e2e.mjs <dossier contenant photo.png>` (13 vérifications, voir le README).
-- Test de sécurité du schéma : `supabase/tests/auth_stub.sql` puis `rls_test.sql` sur un PostgreSQL de test ;
-  les 8 tentatives de fraude doivent toutes être refusées.
+- Test de sécurité du schéma, sur un PostgreSQL de test : `auth_stub.sql`, `storage_stub.sql`, les migrations
+  dans l'ordre, puis `rls_test.sql` et `rls_test_0002.sql` ; 17 cas, résultat attendu affiché pour chacun.
 - Avant chaque commit : build + lint OK. Après un changement d'écran, relancer le test de bout en bout.
 
 ## Organisation du code
 
 - `src/screens/` : un fichier par écran (Bienvenue, Accueil, Recherche, Article, Publier, Messages,
   Conversation, Paiement, Suivi, Armoire).
-- `src/data/model.ts` : types et contexte ; `src/data/store.tsx` : état du **mode démo** (en mémoire).
-  Chaque action du store indique en commentaire l'appel Supabase qui la remplacera.
+- `src/data/model.ts` : types, interface `Store` et contexte. `src/data/store.tsx` choisit entre
+  `demoStore.tsx` (mémoire, sans `.env.local`) et `supabaseStore.tsx` (vraies données). Les deux stores ont
+  la même interface : un écran ne doit jamais tester le mode, sauf pour afficher une aide « mode démo » (`isDemo`).
 - `src/lib/supabase.ts` : client Supabase ; `isDemoMode` vaut `true` sans `.env.local`.
+- `src/lib/photos.ts` : compression des photos (1280 px, JPEG) avant l'envoi.
+- Pages réservées aux comptes : composant `Connecte` dans `src/App.tsx` (redirige vers `/` ou `/profil`).
 - Accessibilité : vrais `<button>`, `<label>` sur chaque champ, `aria-label` sur les boutons-icônes,
   zones tactiles d'au moins 44 px.
 
@@ -77,15 +80,19 @@ npm run lint     # doit passer sans avertissement
 Fait : les 9 écrans, parcours complet en mode démo (chercher → offre → payer → suivre → confirmer,
 publier), schéma Supabase sécurisé et testé, nom Cherifa.
 
-Prochaines étapes, dans l'ordre :
-1. Brancher Supabase (projet région Paris à créer par Cherif) : appliquer le schéma, remplacer le store
-   démo par de vraies données (comptes SMS, annonces, upload des photos, messages en temps réel).
-2. Edge Functions de paiement Wave / Orange Money + séquestre — après création de la SUARL au Sénégal
-   (nécessaire pour les comptes marchands).
-3. Tableau d'administration (litiges, livreurs, remboursements).
+Étape 1 (code) faite : l'app est branchée sur Supabase quand `.env.local` est rempli. Connexion SMS
+(`/code`, `/profil`), annonces et photos réelles, messagerie temps réel, réponse aux offres côté serveur
+(migration 0002). Elle n'a pas encore tourné contre un vrai projet : à valider avec `docs/supabase.md`
+dès que le projet existe. En mode Supabase, « Payer » affiche « bientôt disponible » et les commandes sont vides.
 
-En attente côté Cherif : projet Supabase, SUARL et comptes marchands, vérification du nom Cherifa
-(OAPI, domaines, réseaux), prix de la livraison moto.
+Prochaines étapes, dans l'ordre :
+1. Cherif crée le projet Supabase et suit `docs/supabase.md` ; on teste le parcours réel à deux comptes.
+2. Edge Functions de paiement Wave / Orange Money + séquestre (création de commande, code de remise
+   haché, prix recalculé depuis l'offre acceptée) — après création de la SUARL au Sénégal.
+3. Tableau d'administration (litiges, livreurs, remboursements, validation IMEI).
+
+En attente côté Cherif : projet Supabase et fournisseur SMS, SUARL et comptes marchands, vérification du
+nom Cherifa (OAPI, domaines, réseaux), prix de la livraison moto.
 
 ## Façon de travailler
 
